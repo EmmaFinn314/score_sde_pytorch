@@ -23,7 +23,6 @@ import time
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_gan as tfgan
 import logging
 # Keep the import below for registering all model definitions
 from models import ddpm, ncsnv2, ncsnpp
@@ -32,7 +31,6 @@ import sampling
 from models import utils as mutils
 from models.ema import ExponentialMovingAverage
 import datasets
-import evaluation
 import likelihood
 import sde_lib
 from absl import flags
@@ -183,6 +181,10 @@ def evaluate(config,
     eval_folder: The subfolder for storing evaluation results. Default to
       "eval".
   """
+  # Imported here so that training does not depend on TF-GAN / TF-Hub.
+  import tensorflow_gan as tfgan
+  import evaluation
+
   # Create directory to eval_folder
   eval_dir = os.path.join(workdir, eval_folder)
   tf.io.gfile.makedirs(eval_dir)

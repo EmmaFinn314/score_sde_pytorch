@@ -185,4 +185,4 @@ def to_flattened_numpy(x):
 
 def from_flattened_numpy(x, shape):
   """Form a torch tensor with the given `shape` from a flattened numpy array `x`."""
-  return torch.from_numpy(x.reshape(shape))
+  return torch.from_numpy(x.reshape(shape)).float()  # float32 first: Apple MPS has no float64

@@ -1,5 +1,20 @@
+import os
+
 import ml_collections
 import torch
+
+
+def pick_device():
+  """CUDA if available, then Apple-silicon GPU (MPS), then CPU. Override with SCORE_SDE_DEVICE=cpu|mps|cuda:0."""
+  forced = os.environ.get('SCORE_SDE_DEVICE')
+  if forced:
+    return torch.device(forced)
+  if torch.cuda.is_available():
+    return torch.device('cuda:0')
+  if getattr(torch.backends, 'mps', None) is not None and torch.backends.mps.is_available():
+    return torch.device('mps')
+  return torch.device('cpu')
+
 
 
 def get_default_configs():
@@ -67,6 +82,6 @@ def get_default_configs():
   optim.grad_clip = 1.
 
   config.seed = 42
-  config.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+  config.device = pick_device()
 
   return config

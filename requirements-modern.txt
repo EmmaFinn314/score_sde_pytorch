@@ -1,0 +1,20 @@
+# Current-version dependencies for score_sde_pytorch (the original requirements.txt pins 2021
+# versions, e.g. tensorflow==2.4.0, that no longer install on recent Python or Apple silicon).
+# Install with:  pip install -r requirements-modern.txt
+# Check with:    python check_env.py
+
+# training, sampling, likelihoods
+torch
+torchvision
+numpy
+scipy
+ml-collections
+absl-py
+tensorflow            # used only for data loading (CPU is fine)
+tensorflow-datasets
+tensorboard
+
+# only needed for the original FID / IS / KID evaluation in run_lib.evaluate(); install later if needed:
+# tensorflow-gan
+# tensorflow-hub
+# jax

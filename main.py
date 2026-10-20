@@ -23,6 +23,12 @@ import logging
 import os
 import tensorflow as tf
 
+# TensorFlow is only used for data loading here; stop it from reserving GPU memory.
+try:
+  tf.config.set_visible_devices([], 'GPU')
+except (RuntimeError, ValueError):
+  pass
+
 FLAGS = flags.FLAGS
 
 config_flags.DEFINE_config_file(
