@@ -30,6 +30,10 @@ def get_default_configs():
   training.snapshot_freq_for_preemption = 10000
   ## produce samples at each snapshot.
   training.snapshot_sampling = True
+  ## 0: save a checkpoint every `snapshot_freq` steps. K > 0: instead save K checkpoints at
+  ## log-spaced steps from `first_log_checkpoint` to `n_iters` (listed in checkpoints/steps.json).
+  training.n_log_checkpoints = 0
+  training.first_log_checkpoint = 100
   training.likelihood_weighting = False
   training.continuous = True
   training.reduce_mean = False
@@ -60,6 +64,8 @@ def get_default_configs():
   data.centered = False
   data.uniform_dequantization = False
   data.num_channels = 3
+  data.num_train = 0   # 0: the whole training split; N > 0: only its first N images
+  data.num_test = 0    # 0: the whole test split; N > 0: only its first N images
 
   # model
   config.model = model = ml_collections.ConfigDict()

@@ -15,11 +15,8 @@
 
 """Utility functions for computing FID/Inception scores."""
 
-import jax
 import numpy as np
-import six
 import tensorflow as tf
-import tensorflow_gan as tfgan
 import tensorflow_hub as tfhub
 
 INCEPTION_TFHUB = 'https://tfhub.dev/tensorflow/tfgan/eval/inception/1'
@@ -56,6 +53,18 @@ def load_dataset_stats(config):
     return stats
 
 
+def run_classifier_fn(input_tensor, classifier_fn, num_batches=1, dtypes=None):
+  """Run `classifier_fn` on `input_tensor`, optionally in `num_batches` pieces.
+
+  Replaces tfgan.eval.run_classifier_fn (TF-GAN can't be imported on TensorFlow >= 2.16).
+  `dtypes` is accepted for compatibility and unused.
+  """
+  if num_batches <= 1:
+    return classifier_fn(input_tensor)
+  outputs = [classifier_fn(x) for x in tf.split(input_tensor, num_or_size_splits=num_batches)]
+  return tf.nest.map_structure(lambda *xs: tf.concat(xs, 0), *outputs)
+
+
 def classifier_fn_from_tfhub(output_fields, inception_model,
                              return_tensor=False):
   """Returns a function that can be as a classifier function.
@@ -71,7 +80,7 @@ def classifier_fn_from_tfhub(output_fields, inception_model,
   Returns:
     A one-argument function that takes an image Tensor and returns outputs.
   """
-  if isinstance(output_fields, six.string_types):
+  if isinstance(output_fields, str):
     output_fields = [output_fields]
 
   def _classifier_fn(images):
@@ -81,7 +90,8 @@ def classifier_fn_from_tfhub(output_fields, inception_model,
     if return_tensor:
       assert len(output) == 1
       output = list(output.values())[0]
-    return tf.nest.map_structure(tf.compat.v1.layers.flatten, output)
+    # Flatten everything but the batch dimension (tf.compat.v1.layers needs Keras 2).
+    return tf.nest.map_structure(lambda x: tf.reshape(x, [tf.shape(x)[0], -1]), output)
 
   return _classifier_fn
 
@@ -97,7 +107,7 @@ def run_inception_jit(inputs,
   else:
     inputs = tf.cast(inputs, tf.float32) / 255.
 
-  return tfgan.eval.run_classifier_fn(
+  return run_classifier_fn(
     inputs,
     num_batches=num_batches,
     classifier_fn=classifier_fn_from_tfhub(None, inception_model),
@@ -121,11 +131,13 @@ def run_inception_distributed(input_tensor,
     A dictionary with key `pool_3` and `logits`, representing the pool_3 and
       logits of the inception network respectively.
   """
-  num_tpus = jax.local_device_count()
-  input_tensors = tf.split(input_tensor, num_tpus, axis=0)
+  # Use the GPUs TensorFlow can see (none if main.py hid them), else the CPU.
+  gpus = tf.config.list_logical_devices('GPU')
+  n_devices = max(len(gpus), 1)
+  input_tensors = tf.split(input_tensor, n_devices, axis=0)
   pool3 = []
   logits = [] if not inceptionv3 else None
-  device_format = '/TPU:{}' if 'TPU' in str(jax.devices()[0]) else '/GPU:{}'
+  device_format = '/GPU:{}' if gpus else '/CPU:{}'
   for i, tensor in enumerate(input_tensors):
     with tf.device(device_format.format(i)):
       tensor_on_device = tf.identity(tensor)

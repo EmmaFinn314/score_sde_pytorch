@@ -10,11 +10,18 @@ numpy
 scipy
 ml-collections
 absl-py
-tensorflow            # used only for data loading (CPU is fine)
+tensorflow            # data loading, and the Inception network for FID / KID / IS
 tensorflow-datasets
+importlib-resources   # imported by tensorflow-datasets, which only declares it for Python < 3.9
 tensorboard
 
-# only needed for the original FID / IS / KID evaluation in run_lib.evaluate(); install later if needed:
-# tensorflow-gan
-# tensorflow-hub
-# jax
+# FID / KID / IS evaluation (run_lib.evaluate)
+tensorflow-hub        # downloads the Inception network used by the original code
+tf-keras              # needed by tensorflow-hub on TensorFlow >= 2.16
+# The metrics themselves are in tfgan_metrics.py: TF-GAN (tensorflow-gan) can't be imported on
+# TensorFlow >= 2.16, the only versions available for Python 3.12.
+# FID / KID against CIFAR-10 also need the reference statistics file assets/stats/cifar10_stats.npz:
+# https://drive.google.com/file/d/14UB27-Spi8VjZYKST3ZcT8YVhAluiFWI/view?usp=sharing
+setuptools<81         # tensorflow-hub imports pkg_resources, which setuptools 82 removed
+matplotlib
+pot

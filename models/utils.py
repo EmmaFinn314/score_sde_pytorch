@@ -89,6 +89,9 @@ def create_model(config):
   """Create the score model."""
   model_name = config.model.name
   score_model = get_model(model_name)(config)
+  if torch.device(config.device).type == 'mps':
+    # The `sigmas` buffer is float64 (built from NumPy), and Apple GPUs have no float64.
+    score_model = score_model.float()
   score_model = score_model.to(config.device)
   score_model = torch.nn.DataParallel(score_model)
   return score_model

@@ -21,6 +21,8 @@ import io
 import os
 import time
 
+import json
+
 import numpy as np
 import tensorflow as tf
 import logging
@@ -61,6 +63,9 @@ def train(config, workdir):
 
   # Initialize model.
   score_model = mutils.create_model(config)
+  logging.info("Score model %s: %d parameters (%.2fM)" % (
+    config.model.name, sum(p.numel() for p in score_model.parameters()),
+    sum(p.numel() for p in score_model.parameters()) / 1e6))
   ema = ExponentialMovingAverage(score_model.parameters(), decay=config.model.ema_rate)
   optimizer = losses.get_optimizer(config, score_model.parameters())
   state = dict(optimizer=optimizer, model=score_model, ema=ema, step=0)
@@ -117,6 +122,19 @@ def train(config, workdir):
 
   num_train_steps = config.training.n_iters
 
+  # Checkpoint schedule: every `snapshot_freq` steps, or `n_log_checkpoints` log-spaced steps.
+  # Log-spaced checkpoints are numbered 1, 2, ... (checkpoint_<i>.pth, so `--mode eval` with
+  # eval.begin_ckpt / eval.end_ckpt still works); checkpoints/steps.json maps numbers to steps.
+  n_log_checkpoints = getattr(config.training, 'n_log_checkpoints', 0)
+  if n_log_checkpoints:
+    first = getattr(config.training, 'first_log_checkpoint', 100)
+    log_steps = np.unique(np.round(np.logspace(np.log10(first), np.log10(num_train_steps),
+                                               n_log_checkpoints)).astype(int))
+    log_checkpoint_index = {int(s): i + 1 for i, s in enumerate(log_steps)}
+    with open(os.path.join(checkpoint_dir, "steps.json"), "w") as f:
+      json.dump({str(i): s for s, i in log_checkpoint_index.items()}, f, indent=1)
+    logging.info("Saving %d log-spaced checkpoints at steps %s" % (len(log_steps), [int(s) for s in log_steps]))
+
   # In case there are multiple hosts (e.g., TPU pods), only log to host 0
   logging.info("Starting training loop at step %d." % (initial_step,))
 
@@ -145,9 +163,14 @@ def train(config, workdir):
       writer.add_scalar("eval_loss", eval_loss.item(), step)
 
     # Save a checkpoint periodically and generate samples if needed
-    if step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps:
-      # Save the checkpoint.
+    if n_log_checkpoints:
+      save_now = step in log_checkpoint_index
+      save_step = log_checkpoint_index.get(step)
+    else:
+      save_now = step != 0 and step % config.training.snapshot_freq == 0 or step == num_train_steps
       save_step = step // config.training.snapshot_freq
+    if save_now:
+      # Save the checkpoint.
       save_checkpoint(os.path.join(checkpoint_dir, f'checkpoint_{save_step}.pth'), state)
 
       # Generate and save samples
@@ -181,9 +204,10 @@ def evaluate(config,
     eval_folder: The subfolder for storing evaluation results. Default to
       "eval".
   """
-  # Imported here so that training does not depend on TF-GAN / TF-Hub.
-  import tensorflow_gan as tfgan
+  # Imported here so that training does not need TF-Hub. FID / KID / IS come from tfgan_metrics,
+  # a NumPy port of TF-GAN's metrics (TF-GAN itself can't be imported on TensorFlow >= 2.16).
   import evaluation
+  import tfgan_metrics
 
   # Create directory to eval_folder
   eval_dir = os.path.join(workdir, eval_folder)
@@ -386,18 +410,14 @@ def evaluate(config,
 
       # Compute FID/KID/IS on all samples together.
       if not inceptionv3:
-        inception_score = tfgan.eval.classifier_score_from_logits(all_logits)
+        inception_score = tfgan_metrics.classifier_score_from_logits(all_logits)
       else:
         inception_score = -1
 
-      fid = tfgan.eval.frechet_classifier_distance_from_activations(
+      fid = tfgan_metrics.frechet_classifier_distance_from_activations(
         data_pools, all_pools)
-      # Hack to get tfgan KID work for eager execution.
-      tf_data_pools = tf.convert_to_tensor(data_pools)
-      tf_all_pools = tf.convert_to_tensor(all_pools)
-      kid = tfgan.eval.kernel_classifier_distance_from_activations(
-        tf_data_pools, tf_all_pools).numpy()
-      del tf_data_pools, tf_all_pools
+      kid = tfgan_metrics.kernel_classifier_distance_from_activations(
+        data_pools, all_pools)
 
       logging.info(
         "ckpt-%d --- inception_score: %.6e, FID: %.6e, KID: %.6e" % (

@@ -23,12 +23,6 @@ import logging
 import os
 import tensorflow as tf
 
-# TensorFlow is only used for data loading here; stop it from reserving GPU memory.
-try:
-  tf.config.set_visible_devices([], 'GPU')
-except (RuntimeError, ValueError):
-  pass
-
 FLAGS = flags.FLAGS
 
 config_flags.DEFINE_config_file(
@@ -40,7 +34,24 @@ flags.DEFINE_string("eval_folder", "eval",
 flags.mark_flags_as_required(["workdir", "config", "mode"])
 
 
+def configure_tensorflow_gpus(mode):
+  """TensorFlow loads data in both modes, and runs Inception for FID / KID / IS in eval mode.
+
+  train: hide GPUs from TensorFlow so it can't reserve memory that PyTorch needs.
+  eval:  let TensorFlow use a GPU for Inception, but allocate memory only as needed.
+  """
+  try:
+    if mode == "train":
+      tf.config.set_visible_devices([], 'GPU')
+    else:
+      for gpu in tf.config.list_physical_devices('GPU'):
+        tf.config.experimental.set_memory_growth(gpu, True)
+  except (RuntimeError, ValueError):
+    pass
+
+
 def main(argv):
+  configure_tensorflow_gpus(FLAGS.mode)
   if FLAGS.mode == "train":
     # Create the working directory
     tf.io.gfile.makedirs(FLAGS.workdir)

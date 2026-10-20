@@ -19,3 +19,10 @@ dist/
 
 # Other
 *.DS_Store
+
+# Experiment outputs and large data files
+runs/
+assets/stats/*.npz
+
+runs/
+assets/stats/*.npz

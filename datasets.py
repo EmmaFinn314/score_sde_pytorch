@@ -147,6 +147,14 @@ def get_dataset(config, uniform_dequantization=False, evaluation=False):
     raise NotImplementedError(
       f'Dataset {config.data.dataset} not yet supported.')
 
+  # Optionally keep only the first N examples of each split (TFDS split slicing, e.g. 'train[:2048]').
+  num_train = getattr(config.data, 'num_train', 0)
+  num_test = getattr(config.data, 'num_test', 0)
+  if num_train:
+    train_split_name = f'{train_split_name}[:{num_train}]'
+  if num_test:
+    eval_split_name = f'{eval_split_name}[:{num_test}]'
+
   # Customize preprocess functions for each dataset.
   if config.data.dataset in ['FFHQ', 'CelebAHQ']:
     def preprocess_fn(d):
