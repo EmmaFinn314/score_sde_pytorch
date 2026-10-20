@@ -57,7 +57,8 @@ def main(argv):
     tf.io.gfile.makedirs(FLAGS.workdir)
     # Set logger so that it outputs to both console and file
     # Make logging work for both disk and Google Cloud Storage
-    gfile_stream = open(os.path.join(FLAGS.workdir, 'stdout.txt'), 'w')
+    # Append, so resuming a run (e.g. resubmitting a timed-out Slurm job) keeps the earlier log
+    gfile_stream = open(os.path.join(FLAGS.workdir, 'stdout.txt'), 'a')
     handler = logging.StreamHandler(gfile_stream)
     formatter = logging.Formatter('%(levelname)s - %(filename)s - %(asctime)s - %(message)s')
     handler.setFormatter(formatter)
