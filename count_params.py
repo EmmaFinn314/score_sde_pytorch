@@ -11,7 +11,7 @@ import torch
 from absl import app, flags
 from ml_collections.config_flags import config_flags
 
-from models import ddpm, ncsnpp, ncsnv2  # noqa: F401  (importing registers the architectures)
+from models import ddpm, mlp, ncsnpp, ncsnv2  # noqa: F401  (importing registers the architectures)
 from models import utils as mutils
 
 FLAGS = flags.FLAGS
@@ -25,8 +25,8 @@ def main(argv):
   model = mutils.get_model(config.model.name)(config)
   total = sum(p.numel() for p in model.parameters())
   m = config.model
-  print(f"model {m.name}: nf={m.nf} ch_mult={tuple(m.ch_mult)} num_res_blocks={m.num_res_blocks} "
-        f"attn_resolutions={tuple(m.attn_resolutions)}")
+  sizes = ["nf", "ch_mult", "num_res_blocks", "attn_resolutions", "hidden", "num_layers"]
+  print(f"model {m.name}: " + " ".join(f"{k}={m[k]}" for k in sizes if k in m))
   print(f"parameters: {total:,} ({total / 1e6:.2f}M)")
   by_type = Counter()
   for module in model.modules():

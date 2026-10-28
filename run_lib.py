@@ -27,7 +27,7 @@ import numpy as np
 import tensorflow as tf
 import logging
 # Keep the import below for registering all model definitions
-from models import ddpm, ncsnv2, ncsnpp
+from models import ddpm, ncsnv2, ncsnpp, mlp
 import losses
 import sampling
 from models import utils as mutils

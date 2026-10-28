@@ -55,7 +55,7 @@ import mw_metrics
 import sde_lib
 import tfgan_metrics
 import utils as repo_utils
-from models import ddpm, ncsnpp, ncsnv2  # noqa: F401  (registers the architectures)
+from models import ddpm, mlp, ncsnpp, ncsnv2  # noqa: F401  (registers the architectures)
 from models import utils as mutils
 from models.ema import ExponentialMovingAverage
 
